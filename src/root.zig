@@ -199,6 +199,44 @@ pub const Tokeniser = struct {
         return res;
     }
 
+    test "skip BOM - lext test program" {
+        const bom = "\xEF\xBB\xBF";
+        const source =
+            \\ int main() {
+            \\      return 2;
+            \\ }
+        ;
+        const source_with_bom = bom ++ source;
+
+        var tokeniser = Tokeniser.init(source_with_bom);
+        const alloc = std.testing.allocator;
+
+        const expected_tags = &[_]Token.TokenType{
+            .kw_int,
+            .ident,
+            .open_paren,
+            .close_paren,
+            .open_brace,
+            .kw_return,
+            .numeric_literal,
+            .semicolon,
+            .close_brace,
+            .eof,
+        };
+
+        var toks = std.ArrayList(Token.TokenType).empty;
+        defer toks.deinit(alloc);
+
+        while (true) {
+            const tok = tokeniser.next();
+            try toks.append(alloc, tok.tag);
+
+            if (tok.tag == .eof) break;
+        }
+
+        try std.testing.expectEqualSlices(Token.TokenType, expected_tags, toks.items);
+    }
+
     test "lex test program" {
         const source =
             \\ int main() {
