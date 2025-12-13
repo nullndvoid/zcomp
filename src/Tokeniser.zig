@@ -24,6 +24,7 @@ pub const Token = struct {
         semicolon,
         eof,
         invalid,
+        line_comment,
 
         pub fn lexeme(tag: TokenType) ?[]const u8 {
             return switch (tag) {
@@ -31,6 +32,7 @@ pub const Token = struct {
                 .ident,
                 .numeric_literal,
                 .invalid,
+                .line_comment,
                 => null,
                 .kw_int => "int",
                 .kw_return => "return",
@@ -48,6 +50,7 @@ pub const Token = struct {
                 .numeric_literal => "a numeric literal",
                 .ident => "an identifier",
                 .invalid => "invalid token",
+                .line_comment => "a line comment",
                 // Expand when we expand above.
                 else => unreachable,
             };
@@ -78,14 +81,6 @@ pub fn dump(self: *Tokeniser, token: *const Token) void {
     });
 }
 
-/// Use this in tests so it doesn't look like errors occurred.
-pub fn testDebugLog(self: *Tokeniser, token: *const Token) void {
-    std.log.debug("{s} \"{s}\"\n", .{
-        @tagName(token.tag),
-        self.buffer[token.loc.start..token.loc.end],
-    });
-}
-
 pub fn init(buffer: [:0]const u8) Tokeniser {
     return .{
         .buffer = buffer,
@@ -99,6 +94,8 @@ const State = enum {
     invalid,
     int,
     ident,
+    slash,
+    line_comment,
 };
 
 pub fn next(self: *Tokeniser) Token {
@@ -159,6 +156,10 @@ pub fn next(self: *Tokeniser) Token {
                 self.index += 1;
                 continue :state .int;
             },
+            '/' => {
+                self.index += 1;
+                continue :state .slash;
+            },
             else => {
                 continue :state .invalid;
             },
@@ -194,6 +195,24 @@ pub fn next(self: *Tokeniser) Token {
                 continue :state .int;
             },
             else => {},
+        },
+        .slash => switch (self.buffer[self.index]) {
+            '/' => {
+                self.index += 1;
+                res.tag = .line_comment;
+                continue :state .line_comment;
+            },
+            else => {
+                continue :state .invalid;
+            },
+        },
+        .line_comment => {
+            self.index += 1;
+
+            switch (self.buffer[self.index]) {
+                '\n', 0 => {},
+                else => continue :state .line_comment,
+            }
         },
     }
 
@@ -290,4 +309,55 @@ test "tokenise invalid - early EOF" {
     }
 
     try std.testing.expectEqualSlices(Token.TokenType, &.{ .invalid, .eof }, toks.items);
+}
+
+// Handles comments and the simplest possible C function.
+test "tokenise 01_int_main.c" {
+    const alloc = std.testing.allocator;
+    const file_path = "test/01_int_main.c";
+
+    var buf: [4096]u8 = undefined;
+    const file = try std.fs.cwd().openFile(file_path, .{});
+    var rdr = file.reader(&buf);
+    const file_stat = try file.stat();
+
+    const bytes = try rdr.interface.readAlloc(alloc, file_stat.size);
+    const bytes_sentinel = try alloc.dupeZ(u8, bytes);
+
+    defer alloc.free(bytes_sentinel);
+    alloc.free(bytes);
+
+    var tokeniser = Tokeniser.init(bytes_sentinel);
+    var toks = std.ArrayList(Token).empty;
+    defer toks.deinit(alloc);
+
+    const expected = &[_]Token{
+        .{ .tag = .line_comment, .loc = .{ .start = 0, .end = 11 } },
+        .{ .tag = .kw_int, .loc = .{ .start = 12, .end = 15 } },
+        .{ .tag = .ident, .loc = .{ .start = 16, .end = 20 } },
+        .{ .tag = .open_paren, .loc = .{ .start = 20, .end = 21 } },
+        .{ .tag = .close_paren, .loc = .{ .start = 21, .end = 22 } },
+        .{ .tag = .open_brace, .loc = .{ .start = 23, .end = 24 } },
+        .{ .tag = .kw_return, .loc = .{ .start = 29, .end = 35 } },
+        .{ .tag = .numeric_literal, .loc = .{ .start = 36, .end = 38 } },
+        .{ .tag = .semicolon, .loc = .{ .start = 38, .end = 39 } },
+        .{ .tag = .line_comment, .loc = .{ .start = 40, .end = 55 } },
+        .{ .tag = .close_brace, .loc = .{ .start = 56, .end = 57 } },
+        .{ .tag = .eof, .loc = .{ .start = 58, .end = 58 } },
+    };
+
+    while (true) {
+        const tok = tokeniser.next();
+        try toks.append(alloc, tok);
+        if (tok.tag == .eof) break;
+    }
+
+    try std.testing.expectEqualSlices(Token, expected, toks.items);
+
+    const first_comment_loc = toks.items[0].loc;
+    try std.testing.expectEqualSlices(
+        u8,
+        "// Skip me.",
+        bytes_sentinel[first_comment_loc.start..first_comment_loc.end],
+    );
 }
