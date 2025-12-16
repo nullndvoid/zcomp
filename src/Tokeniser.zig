@@ -1,5 +1,6 @@
 //! The tokeniser code. Just a simple big state machine we can easily extend.
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 pub const Token = struct {
     tag: TokenType,
@@ -97,6 +98,21 @@ const State = enum {
     slash,
     line_comment,
 };
+
+/// Helper method for Tokenising the whole file. Caller frees returned slice.
+pub fn collectToEof(self: *Tokeniser, alloc: Allocator) Allocator.Error![]Token {
+    var out = std.ArrayList(Token).empty;
+    defer out.deinit(alloc);
+
+    while (true) {
+        const tok = self.next();
+        try out.append(alloc, tok);
+
+        if (tok.tag == .eof) break;
+    }
+
+    return try out.toOwnedSlice(alloc);
+}
 
 pub fn next(self: *Tokeniser) Token {
     var res: Token = .{

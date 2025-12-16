@@ -74,7 +74,7 @@ pub const Expr = union(enum) {
 /// Integer literal expression.
 pub const IntLiteral = struct {
     /// TODO: Check what C wants.
-    value: i64,
+    value: usize,
 };
 
 /// Taken from the standard library, true if we want safety checks.
@@ -89,7 +89,6 @@ source: [:0]const u8,
 tokens: TokenList,
 nodes: NodeList,
 errors: []const Error,
-// extra_data: []u32,
 
 pub fn parse(alloc: Allocator, source: [:0]const u8) Allocator.Error!Ast {
     // Tokenise the source.
@@ -111,7 +110,7 @@ pub fn parse(alloc: Allocator, source: [:0]const u8) Allocator.Error!Ast {
     return Ast{
         .errors = undefined,
         .nodes = undefined,
-        .source = undefined,
+        .source = source,
         .tokens = undefined,
     };
 }

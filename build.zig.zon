@@ -3,7 +3,12 @@
     .version = "0.1.0",
     .fingerprint = 0x9f0ebf55dfb58a20,
     .minimum_zig_version = "0.15.2",
-    .dependencies = .{},
+    .dependencies = .{
+        .functools = .{
+            .url = "git+https://github.com/ali-shahwali/zig-functools#fc8c7f96d2ed0c9c6ef356f6f863c2ea4b1e8830",
+            .hash = "functools-0.2.0-EiinLNalAACq5WVO3xN3tiCiP8BBsgKbDwwuhvE5wIth",
+        },
+    },
     .paths = .{
         "build.zig",
         "build.zig.zon",

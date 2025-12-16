@@ -5,11 +5,18 @@ pub fn build(b: *std.Build) void {
 
     const optimize = b.standardOptimizeOption(.{});
 
+    const functools = b.dependency("functools", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     const mod = b.addModule("zcomp", .{
         .root_source_file = b.path("src/root.zig"),
 
         .target = target,
     });
+
+    mod.addImport("functools", functools.module("functools"));
 
     const exe = b.addExecutable(.{
         .name = "zcomp",
