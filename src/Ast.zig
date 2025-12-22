@@ -11,12 +11,14 @@ const Ast = @This();
 const TokenList = std.ArrayList(Token);
 const NodeList = std.ArrayList(Node);
 
+const NodeIdx = usize;
+
 /// Represents a source location for error reporting and debugging.
 pub const SourceLoc = struct {
     /// Could be a file index or path; for now, a string slice.
     file: []const u8,
-    line: u32,
-    column: u32,
+    line: usize,
+    column: usize,
 };
 
 pub const Node = struct {
@@ -63,7 +65,7 @@ pub const BlockStmt = struct {
 /// Return statement node.
 pub const ReturnStmt = struct {
     /// Optional expression (null for void returns, but present here).
-    expr: ?*Node,
+    expr: ?NodeIdx,
 };
 
 /// Expression union for different expression types.
